@@ -71,13 +71,14 @@ function createHandwrittenNotesPDF(PDFLib) {
    * Build the page content stream text for a paper style.
    * @param {string} style Paper style.
    * @param {{x:number,y:number,width:number,height:number}} box Drawing box in pt.
+   * @param {number} [unit] Page /UserUnit; mm lengths are divided by it (default 1).
    * @returns {string} Content stream text, "" for blank or when no line fits.
    */
-  function buildPaperContent(style, box) {
+  function buildPaperContent(style, box, unit = 1) {
     if (style !== "ruled-6mm" && style !== "grid-5mm") {
       return "";
     }
-    const m = mmToPt(10);
+    const m = mmToPt(10) / unit;
     const xLeft = box.x + m;
     const xRight = box.x + box.width - m;
     const yTop = box.y + box.height - m;
@@ -85,7 +86,7 @@ function createHandwrittenNotesPDF(PDFLib) {
     const segs = [];
     let head;
     if (style === "ruled-6mm") {
-      const step = mmToPt(6);
+      const step = mmToPt(6) / unit;
       for (let k = 0; yTop - k * step >= yBottom - EPS; k++) {
         const y = yTop - k * step;
         segs.push([xLeft, y, xRight, y]);
@@ -95,7 +96,7 @@ function createHandwrittenNotesPDF(PDFLib) {
       }
       head = "0.5 w\n0.62 0.7 0.8 RG";
     } else {
-      const step = mmToPt(5);
+      const step = mmToPt(5) / unit;
       const xs = [];
       const ys = [];
       for (let i = 0; xLeft + i * step <= xRight + EPS; i++) {
@@ -125,10 +126,19 @@ function createHandwrittenNotesPDF(PDFLib) {
     return lines.join("\n") + "\n";
   }
 
-  const encoder = new TextEncoder();
-
+  /**
+   * Encode a binary string (one char per byte, as pdf-lib keeps literal strings) as Latin-1 bytes.
+   */
   function enc(s) {
-    return encoder.encode(s);
+    const out = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) {
+      const c = s.charCodeAt(i);
+      if (c > 0xff) {
+        throw new Error(`Character code ${c} at ${i} is not representable as Latin-1.`);
+      }
+      out[i] = c & 0xff;
+    }
+    return out;
   }
 
   function concat(parts) {
@@ -193,13 +203,22 @@ function createHandwrittenNotesPDF(PDFLib) {
    * @returns {{offset:number, kind:string, ref:object|null}}
    */
   function locateXref(doc, bytes) {
-    const tailStart = Math.max(0, bytes.length - 4096);
-    const tail = latin1(bytes, tailStart);
-    const idx = tail.lastIndexOf("startxref");
+    const key = enc("startxref");
+    let idx = -1;
+    for (let i = bytes.length - key.length; i >= 0 && idx < 0; i--) {
+      let j = 0;
+      while (j < key.length && bytes[i + j] === key[j]) {
+        j++;
+      }
+      if (j === key.length) {
+        idx = i;
+      }
+    }
     if (idx < 0) {
       throw unsupported("startxref not found.");
     }
-    const m = /^\s*(\d+)/.exec(tail.slice(idx + "startxref".length, idx + "startxref".length + 64));
+    const after = idx + key.length;
+    const m = /^\s*(\d+)/.exec(latin1(bytes, after, Math.min(bytes.length, after + 64)));
     if (!m) {
       throw unsupported("startxref offset not parsable.");
     }
@@ -379,9 +398,37 @@ function createHandwrittenNotesPDF(PDFLib) {
 
     // Geometry from the last page.
     const last = doc.getPages().at(-1);
-    const media = last.getMediaBox();
-    const crop = last.getCropBox();
+    const norm = (b) => {
+      const x1 = b.x + b.width;
+      const y1 = b.y + b.height;
+      return { x: Math.min(b.x, x1), y: Math.min(b.y, y1), width: Math.abs(b.width), height: Math.abs(b.height) };
+    };
+    const media = norm(last.getMediaBox());
+    const cropRaw = norm(last.getCropBox());
+    // Effective crop = CropBox ∩ MediaBox (MediaBox when empty).
+    const ix0 = Math.max(media.x, cropRaw.x);
+    const iy0 = Math.max(media.y, cropRaw.y);
+    const ix1 = Math.min(media.x + media.width, cropRaw.x + cropRaw.width);
+    const iy1 = Math.min(media.y + media.height, cropRaw.y + cropRaw.height);
+    const crop = ix1 - ix0 > 0 && iy1 - iy0 > 0 ? { x: ix0, y: iy0, width: ix1 - ix0, height: iy1 - iy0 } : media;
     const angle = ((last.getRotation().angle % 360) + 360) % 360;
+    // /UserUnit of the last page itself (not inherited).
+    let unit = 1;
+    let unitStr = null;
+    const uuRaw = last.node.lookup(PDFName.of("UserUnit"));
+    if (uuRaw !== undefined) {
+      if (!(uuRaw instanceof PDFNumber) || !Number.isFinite(uuRaw.asNumber()) || uuRaw.asNumber() <= 0) {
+        throw unsupported("Invalid /UserUnit.");
+      }
+      unit = uuRaw.asNumber();
+      if (unit !== 1) {
+        unitStr = unit.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+        unit = Number(unitStr);
+        if (!(unit > 0)) {
+          throw unsupported("Invalid /UserUnit.");
+        }
+      }
+    }
     // Boxes are written with fmt(); use the written (rounded) values everywhere.
     const rounded = (x, y, w, h) => ({
       x: Number(fmt(x)),
@@ -407,7 +454,7 @@ function createHandwrittenNotesPDF(PDFLib) {
       drawBox = rounded(0, 0, W, H);
       expectedMedia = drawBox;
     }
-    const content = buildPaperContent(style, drawBox);
+    const content = buildPaperContent(style, drawBox, unit);
     const contentBytes = enc(content);
 
     let next = Math.max(trailer.Size, doc.context.largestObjectNumber + 1);
@@ -441,6 +488,9 @@ function createHandwrittenNotesPDF(PDFLib) {
     }
 
     let pageText = `<< /Type /Page /Parent ${pagesRef.toString()} /MediaBox ${mediaStr} /CropBox ${cropStr} /Rotate 0 /Resources << >>`;
+    if (unitStr !== null) {
+      pageText += ` /UserUnit ${unitStr}`;
+    }
     if (content) {
       pageText += ` /Contents ${contentNum} 0 R`;
     }
