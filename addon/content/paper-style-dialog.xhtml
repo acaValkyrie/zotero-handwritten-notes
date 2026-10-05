@@ -34,9 +34,9 @@
 		buttons="cancel,accept"
 		data-l10n-attrs="buttonlabelaccept"
 	>
-		<vbox>
-			<description id="info" hidden="true"/>
-			<description id="notice" hidden="true"/>
+		<vbox style="min-width: 350px;">
+			<description id="info" hidden="true" style="max-width: 340px;"/>
+			<description id="notice" hidden="true" style="max-width: 340px;"/>
 			<label id="style-label" data-l10n-id="handwritten-notes-paper-style" control="paper-style"/>
 			<radiogroup id="paper-style">
 				<radio value="blank" data-l10n-id="handwritten-notes-style-blank"/>
@@ -47,7 +47,7 @@
 				<label id="count-label" data-l10n-id="handwritten-notes-page-count" control="page-count"/>
 				<html:input id="page-count" type="number" min="1" max="100" step="1" style="width: 5em;"/>
 			</hbox>
-			<description id="range" hidden="true"/>
-			<description id="note" hidden="true" style="opacity: 0.7;"/>
+			<description id="range" hidden="true" style="max-width: 340px;"/>
+			<description id="note" hidden="true" style="max-width: 340px; opacity: 0.7;"/>
 		</vbox>	</dialog>
 </window>

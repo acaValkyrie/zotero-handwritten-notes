@@ -1,6 +1,24 @@
 var HandwrittenNotesPaperStyleDialog = {
   MODES: ["create", "add", "add-multiple", "remove"],
 
+  // Fluent fills in localized text asynchronously, so the window must be resized
+  // after the text is in place; otherwise wrapped lines are clipped.
+  async resize() {
+    try {
+      const elements = [...document.querySelectorAll("[data-l10n-id]")].filter(el => !el.hidden);
+      if (elements.length) {
+        await document.l10n.translateElements(elements);
+      }
+      else {
+        await document.l10n.ready;
+      }
+    }
+    catch (e) {
+      // fall through and size with whatever text is present
+    }
+    window.sizeToContent();
+  },
+
   init() {
     const io = window.arguments[0];
     const group = document.getElementById("paper-style");
@@ -55,6 +73,7 @@ var HandwrittenNotesPaperStyleDialog = {
             range.removeAttribute("data-l10n-id");
             range.textContent = "";
             range.hidden = true;
+            this.resize();
             return;
           }
           range.hidden = false;
@@ -67,6 +86,7 @@ var HandwrittenNotesPaperStyleDialog = {
               to: io.pageCount
             });
           }
+          this.resize();
         };
         input.addEventListener("input", update);
         update();
@@ -78,6 +98,8 @@ var HandwrittenNotesPaperStyleDialog = {
       note.hidden = false;
       document.l10n.setAttributes(note, io.note);
     }
+
+    this.resize();
 
     document.addEventListener("dialogaccept", (event) => {
       if (showCount) {
