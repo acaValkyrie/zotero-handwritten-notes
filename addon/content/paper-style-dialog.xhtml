@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+
+<?xml-stylesheet href="chrome://global/skin/"?>
+<?xml-stylesheet href="chrome://zotero/skin/zotero.css" type="text/css"?>
+<?xml-stylesheet href="chrome://zotero/skin/overlay.css" type="text/css"?>
+<?xml-stylesheet href="chrome://zotero-platform/content/overlay.css"?>
+<?xml-stylesheet href="chrome://zotero-platform/content/zotero.css"?>
+
+<window
+	xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+	xmlns:html="http://www.w3.org/1999/xhtml"
+	id="handwritten-notes-paper-style-dialog"
+	class="zotero-dialog"
+	data-l10n-attrs="title"
+	width="380"
+	drawintitlebar-platforms="mac"
+	onload="HandwrittenNotesPaperStyleDialog.init()"
+>
+	<script>
+		Services.scriptloader.loadSubScript('chrome://zotero/content/include.js', this);
+		Services.scriptloader.loadSubScript('chrome://zotero/content/titlebar.js', this);
+		Services.scriptloader.loadSubScript('chrome://zotero/content/customElements.js', this);
+		Services.scriptloader.loadSubScript('chrome://handwritten-notes/content/paper-style-dialog.js', this);
+	</script>
+
+	<linkset>
+		<html:link rel="localization" href="branding/brand.ftl"/>
+		<html:link rel="localization" href="zotero.ftl"/>
+		<html:link rel="localization" href="handwritten-notes.ftl"/>
+	</linkset>
+
+	<dialog
+		id="dialog"
+		buttons="cancel,accept"
+		data-l10n-attrs="buttonlabelaccept"
+	>
+		<vbox>
+			<description id="notice" hidden="true"/>
+			<label data-l10n-id="handwritten-notes-paper-style" control="paper-style"/>
+			<radiogroup id="paper-style">
+				<radio value="blank" data-l10n-id="handwritten-notes-style-blank"/>
+				<radio value="ruled-6mm" data-l10n-id="handwritten-notes-style-ruled-6mm"/>
+				<radio value="grid-5mm" data-l10n-id="handwritten-notes-style-grid-5mm"/>
+			</radiogroup>
+		</vbox>
+	</dialog>
+</window>
