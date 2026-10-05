@@ -40,3 +40,4 @@ handwritten-notes-error-save-failed = Failed to save the PDF. The original file 
 handwritten-notes-error-file-changed = The PDF was modified by another program during the operation. Nothing was changed; please try again.
 handwritten-notes-error-notify-failed = The page was added, but Zotero could not be notified of the change. Run Sync manually to upload the file.
 handwritten-notes-error-generic = An unexpected error occurred. See Help → Debug Output Logging for details.
+handwritten-notes-error-sync-required = A newer version of this PDF is on the server, or it has a sync conflict. Sync first, then try again.

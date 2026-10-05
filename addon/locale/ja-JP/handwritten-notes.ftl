@@ -40,3 +40,4 @@ handwritten-notes-error-save-failed = PDFを保存できませんでした。元
 handwritten-notes-error-file-changed = 処理中にPDFが他のプログラムによって変更されました。何も変更していません。もう一度お試しください。
 handwritten-notes-error-notify-failed = ページは追加しましたが、Zoteroへの変更通知に失敗しました。手動で同期を実行してファイルをアップロードしてください。
 handwritten-notes-error-generic = 予期しないエラーが発生しました。詳細は「ヘルプ → デバッグ出力ログ」を参照してください。
+handwritten-notes-error-sync-required = このPDFはサーバーにより新しい版があるか、同期の競合が起きています。先に同期してから、もう一度お試しください。

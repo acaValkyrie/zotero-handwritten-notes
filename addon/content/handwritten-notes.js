@@ -246,6 +246,18 @@ var HandwrittenNotes = {
   async addPage(win, item) {
     if (!this.checkLibraryEditable(win, item)) return;
 
+    if (item.attachmentLinkMode === Zotero.Attachments.LINK_MODE_IMPORTED_FILE
+        || item.attachmentLinkMode === Zotero.Attachments.LINK_MODE_IMPORTED_URL) {
+      const local = Zotero.Sync.Storage.Local;
+      const state = item.attachmentSyncState;
+      if (state === local.SYNC_STATE_TO_DOWNLOAD
+          || state === local.SYNC_STATE_FORCE_DOWNLOAD
+          || state === local.SYNC_STATE_IN_CONFLICT) {
+        this.alert(win, "sync-required");
+        return;
+      }
+    }
+
     const path = await item.getFilePathAsync();
     if (!path) {
       this.alert(win, "file-not-found");
