@@ -64,6 +64,7 @@ var HandwrittenNotes = {
         {
           menuType: "menuitem",
           l10nID: "handwritten-notes-menu-create",
+          icon: "chrome://handwritten-notes/content/icons/menu-create.svg",
           onShowing: (event, context) => {
             const item = selectedItem(context);
             context.setVisible(!!item && item.isRegularItem());
@@ -73,6 +74,7 @@ var HandwrittenNotes = {
         {
           menuType: "menuitem",
           l10nID: "handwritten-notes-menu-add-page",
+          icon: "chrome://handwritten-notes/content/icons/menu-add-page.svg",
           onShowing: (event, context) => {
             const item = selectedItem(context);
             context.setVisible(!!item && item.isAttachment() && item.isPDFAttachment());

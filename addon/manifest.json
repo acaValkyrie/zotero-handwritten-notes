@@ -3,6 +3,7 @@
   "name": "Zotero Handwritten Notes",
   "version": "0.1.0",
   "description": "Create handwritten-note PDFs (blank / 6 mm ruled / 5 mm grid) attached to Zotero items and append pages without touching existing pages.",
+  "icons": { "48": "content/icons/icon.svg", "96": "content/icons/icon.svg" },
   "author": "acaValkyrie",
   "homepage_url": "https://github.com/acaValkyrie/zotero-handwritten-notes",
   "applications": {
