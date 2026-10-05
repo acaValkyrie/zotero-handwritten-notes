@@ -154,6 +154,21 @@ function createHandwrittenNotesPDF(PDFLib) {
     return s;
   }
 
+  /**
+   * Copy any ArrayBuffer / ArrayBuffer view (possibly from another realm) into this realm's Uint8Array.
+   * instanceof checks fail across realms (e.g. IOUtils.read results in a Zotero plugin sandbox).
+   */
+  function toBytes(input) {
+    if (ArrayBuffer.isView(input)) {
+      return new Uint8Array(input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength));
+    }
+    const tag = Object.prototype.toString.call(input);
+    if (tag === "[object ArrayBuffer]" || tag === "[object SharedArrayBuffer]") {
+      return new Uint8Array(input.slice(0));
+    }
+    throw new HandwrittenNotesError("PARSE_FAILED", "Input is not a byte array.");
+  }
+
   async function loadDoc(bytes) {
     try {
       return await PDFDocument.load(bytes, { updateMetadata: false });
@@ -295,6 +310,7 @@ function createHandwrittenNotesPDF(PDFLib) {
    * @returns {Promise<{status:"ok"|"missing"|"invalid", style:string|null, raw:string|null}>}
    */
   async function readPaperStyle(bytes) {
+    bytes = toBytes(bytes);
     const doc = await loadDoc(bytes);
     let infoObj = doc.context.trailerInfo.Info;
     if (!infoObj) {
@@ -341,6 +357,7 @@ function createHandwrittenNotesPDF(PDFLib) {
     if (!isPaperStyle(style)) {
       throw new HandwrittenNotesError("INVALID_STYLE", `Unknown paper style: ${String(style)}`);
     }
+    bytes = toBytes(bytes);
     const doc = await loadDoc(bytes);
     const trailer = getTrailer(doc, bytes);
     if (trailer.Encrypt) {
