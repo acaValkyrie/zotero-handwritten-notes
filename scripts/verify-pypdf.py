@@ -62,6 +62,7 @@ def main():
         "note-blank.pdf": 3,
         "note-ruled-6mm.pdf": 3,
         "note-grid-5mm.pdf": 3,
+        "note-removed.pdf": 3,
         "xref-stream-appended.pdf": 4,
     }
     for name, pages in expected.items():

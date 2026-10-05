@@ -25,6 +25,12 @@ async function main() {
     fs.writeFileSync(path.join(outDir, `note-${style}.pdf`), bytes);
   }
 
+  {
+    const many = (await core.appendPages(await core.createNotePdf("ruled-6mm"), "ruled-6mm", 4)).bytes;
+    const removed = await core.removeLastPages(many, 2);
+    fs.writeFileSync(path.join(outDir, "note-removed.pdf"), removed.bytes);
+  }
+
   const xrefStream = await fx.buildXrefStreamPdf();
   const appended = await core.appendPage(xrefStream, "ruled-6mm");
   fs.writeFileSync(path.join(outDir, "xref-stream-appended.pdf"), appended.bytes);
