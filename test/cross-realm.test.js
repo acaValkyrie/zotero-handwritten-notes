@@ -25,7 +25,7 @@ test("readPaperStyle and appendPage accept a Uint8Array from another realm", asy
   const note = await core.createNotePdf("ruled-6mm");
   const f = foreignBytes(note);
   const info = await core.readPaperStyle(f);
-  assert.deepEqual(info, { status: "ok", style: "ruled-6mm", raw: "ruled-6mm" });
+  assert.deepEqual(info, { status: "ok", style: "ruled-6mm", raw: "ruled-6mm", pageCount: 1 });
   const res = await core.appendPage(f, "grid-5mm");
   assert.equal(res.previousPageCount, 1);
   assert.equal(res.pageCount, 2);

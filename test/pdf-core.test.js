@@ -135,7 +135,7 @@ test("createNotePdf: one A4 page per style with metadata", async () => {
     near(mb.height, A4.height, 1e-6);
     const hasContents = doc.getPage(0).node.has(PDFName.of("Contents"));
     assert.equal(hasContents, style !== "blank");
-    assert.deepEqual(await readPaperStyle(bytes), { status: "ok", style, raw: style });
+    assert.deepEqual(await readPaperStyle(bytes), { status: "ok", style, raw: style, pageCount: 1 });
     assert.equal(doc.getTitle(), "Handwritten Notes");
   }
 });
@@ -155,7 +155,7 @@ test("appendPage x3 on created notes", async () => {
       assert.equal(res.previousPageCount, n - 1);
       assert.ok(isPrefix(before, res.bytes));
       bytes = res.bytes;
-      assert.deepEqual(await readPaperStyle(bytes), { status: "ok", style, raw: style });
+      assert.deepEqual(await readPaperStyle(bytes), { status: "ok", style, raw: style, pageCount: n });
       const doc = await PDFDocument.load(bytes, { updateMetadata: false });
       assert.equal(doc.getPageCount(), n);
       const text = pageContentText(doc, n - 1);
@@ -241,12 +241,12 @@ test("appendPage: rotated last page gives displayed-size page with /Rotate 0", a
 
 test("readPaperStyle: missing and invalid", async () => {
   const noInfo = await fx.buildNoInfoPdf();
-  assert.deepEqual(await readPaperStyle(noInfo), { status: "missing", style: null, raw: null });
+  assert.deepEqual(await readPaperStyle(noInfo), { status: "missing", style: null, raw: null, pageCount: 1 });
   const noKey = await PDFDocument.create();
   noKey.addPage([200, 200]);
   assert.equal((await readPaperStyle(await noKey.save())).status, "missing");
   const invalid = await fx.buildInvalidStylePdf("ruled-7mm");
-  assert.deepEqual(await readPaperStyle(invalid), { status: "invalid", style: null, raw: "ruled-7mm" });
+  assert.deepEqual(await readPaperStyle(invalid), { status: "invalid", style: null, raw: "ruled-7mm", pageCount: 1 });
 });
 
 test("readPaperStyle works on xref-stream PDFs", async () => {

@@ -17,6 +17,7 @@ function createHandwrittenNotesPDF(PDFLib) {
   const PAPER_STYLES = Object.freeze(["blank", "ruled-6mm", "grid-5mm"]);
   const METADATA_KEY = "ZoteroHandwrittenNotesPaperStyle";
   const EPS = 1e-6;
+  const MAX_ADD_PAGES = 100;
 
   /**
    * Convert millimetres to PDF points (no rounding).
@@ -34,7 +35,7 @@ function createHandwrittenNotesPDF(PDFLib) {
    */
   class HandwrittenNotesError extends Error {
     /**
-     * @param {string} code One of INVALID_STYLE, ENCRYPTED, PARSE_FAILED, UNSUPPORTED_STRUCTURE, VALIDATION_FAILED.
+     * @param {string} code One of INVALID_STYLE, INVALID_COUNT, NOT_NOTEBOOK, ENCRYPTED, PARSE_FAILED, UNSUPPORTED_STRUCTURE, VALIDATION_FAILED.
      * @param {string} message
      * @param {unknown} [cause]
      */
@@ -326,11 +327,12 @@ function createHandwrittenNotesPDF(PDFLib) {
   /**
    * Read the paper style stored in the Info dictionary.
    * @param {Uint8Array} bytes PDF bytes.
-   * @returns {Promise<{status:"ok"|"missing"|"invalid", style:string|null, raw:string|null}>}
+   * @returns {Promise<{status:"ok"|"missing"|"invalid", style:string|null, raw:string|null, pageCount:number}>}
    */
   async function readPaperStyle(bytes) {
     bytes = toBytes(bytes);
     const doc = await loadDoc(bytes);
+    const pageCount = doc.getPageCount();
     let infoObj = doc.context.trailerInfo.Info;
     if (!infoObj) {
       try {
@@ -341,20 +343,20 @@ function createHandwrittenNotesPDF(PDFLib) {
     }
     const info = infoObj ? doc.context.lookup(infoObj) : undefined;
     if (!(info instanceof PDFDict)) {
-      return { status: "missing", style: null, raw: null };
+      return { status: "missing", style: null, raw: null, pageCount };
     }
     const value = info.lookup(PDFName.of(METADATA_KEY));
     if (value === undefined) {
-      return { status: "missing", style: null, raw: null };
+      return { status: "missing", style: null, raw: null, pageCount };
     }
     if (value instanceof PDFString || value instanceof PDFHexString) {
       const raw = value.decodeText();
       if (isPaperStyle(raw)) {
-        return { status: "ok", style: raw, raw };
+        return { status: "ok", style: raw, raw, pageCount };
       }
-      return { status: "invalid", style: null, raw };
+      return { status: "invalid", style: null, raw, pageCount };
     }
-    return { status: "invalid", style: null, raw: null };
+    return { status: "invalid", style: null, raw: null, pageCount };
   }
 
   function boxArray(x, y, w, h) {
@@ -367,22 +369,15 @@ function createHandwrittenNotesPDF(PDFLib) {
   }
 
   /**
-   * Append a new page to a PDF using an incremental update (original bytes preserved).
-   * @param {Uint8Array} bytes Original PDF bytes.
-   * @param {string} style Paper style of the new page.
-   * @returns {Promise<{bytes:Uint8Array, pageCount:number, previousPageCount:number}>}
+   * Load a PDF and the root of its page tree for an incremental update.
+   * @returns {Promise<{doc:object, trailer:object, pagesRef:object, pagesDict:object, kids:object, count:number, pageRefs:string[]}>}
    */
-  async function appendPage(bytes, style) {
-    if (!isPaperStyle(style)) {
-      throw new HandwrittenNotesError("INVALID_STYLE", `Unknown paper style: ${String(style)}`);
-    }
-    bytes = toBytes(bytes);
+  async function loadPageTree(bytes) {
     const doc = await loadDoc(bytes);
     const trailer = getTrailer(doc, bytes);
     if (trailer.Encrypt) {
       throw new HandwrittenNotesError("ENCRYPTED", "The PDF is encrypted.");
     }
-
     const catalog = doc.context.lookup(trailer.Root, PDFDict);
     const pagesRef = catalog.get(PDFName.of("Pages"));
     if (!(pagesRef instanceof PDFRef)) {
@@ -394,8 +389,132 @@ function createHandwrittenNotesPDF(PDFLib) {
     if (count < 1 || count !== doc.getPageCount()) {
       throw unsupported("Page tree count mismatch.");
     }
-    const originalPageRefs = doc.getPages().map((p) => p.ref.toString());
+    return { doc, trailer, pagesRef, pagesDict, kids, count, pageRefs: doc.getPages().map((p) => p.ref.toString()) };
+  }
 
+  /**
+   * Serialize an incremental update (new/rewritten objects + xref section) after the original bytes.
+   * @param {Uint8Array} bytes Original bytes.
+   * @param {object} trailer Result of getTrailer.
+   * @param {{num:number, gen:number, body:Uint8Array[]}[]} objects Objects in write order.
+   * @param {number|null} xrefNum Object number of the xref stream (stream kind only).
+   * @returns {{result:Uint8Array, recorded:{num:number, gen:number, offset:number}[]}}
+   */
+  function writeUpdate(bytes, trailer, objects, xrefNum) {
+    const prefix = bytes.length > 0 && bytes[bytes.length - 1] !== 0x0a && bytes[bytes.length - 1] !== 0x0d ? enc("\n") : new Uint8Array(0);
+    let pos = bytes.length + prefix.length;
+    const parts = [prefix];
+    const written = []; // {num, gen, offset}
+    for (const obj of objects) {
+      written.push({ num: obj.num, gen: obj.gen, offset: pos });
+      for (const c of [enc(`${obj.num} ${obj.gen} obj\n`), ...obj.body]) {
+        parts.push(c);
+        pos += c.length;
+      }
+    }
+
+    const highest = Math.max(...written.map((w) => w.num), xrefNum === null ? 0 : xrefNum);
+    const newSize = Math.max(trailer.Size, highest + 1);
+    const trailerKeys =
+      `/Root ${trailer.Root.toString()}` +
+      (trailer.Info ? ` /Info ${trailer.Info.toString()}` : "") +
+      (trailer.ID ? ` /ID ${trailer.ID.toString()}` : "");
+
+    let xrefStart;
+    let recorded;
+    if (trailer.kind === "table") {
+      xrefStart = pos;
+      const sorted = [...written].sort((a, b) => a.num - b.num);
+      let t = "xref\n0 1\n0000000000 65535 f\r\n";
+      for (const w of sorted) {
+        t += `${w.num} 1\n${String(w.offset).padStart(10, "0")} ${String(w.gen).padStart(5, "0")} n\r\n`;
+      }
+      t += `trailer\n<< /Size ${newSize} ${trailerKeys} /Prev ${trailer.xrefOffset} >>\nstartxref\n${xrefStart}\n%%EOF\n`;
+      parts.push(enc(t));
+      recorded = sorted;
+    } else {
+      xrefStart = pos;
+      const all = [...written, { num: xrefNum, gen: 0, offset: xrefStart }].sort((a, b) => a.num - b.num);
+      const rows = new Uint8Array(all.length * 7);
+      all.forEach((w, i) => {
+        const o = i * 7;
+        rows[o] = 1;
+        rows[o + 1] = (w.offset >>> 24) & 0xff;
+        rows[o + 2] = (w.offset >>> 16) & 0xff;
+        rows[o + 3] = (w.offset >>> 8) & 0xff;
+        rows[o + 4] = w.offset & 0xff;
+        rows[o + 5] = (w.gen >>> 8) & 0xff;
+        rows[o + 6] = w.gen & 0xff;
+      });
+      const index = all.map((w) => `${w.num} 1`).join(" ");
+      parts.push(enc(`${xrefNum} 0 obj\n<< /Type /XRef /Size ${newSize} /W [1 4 2] /Index [${index}] /Prev ${trailer.xrefOffset} ${trailerKeys} /Length ${rows.length} >>\nstream\n`));
+      parts.push(rows);
+      parts.push(enc(`\nendstream\nendobj\nstartxref\n${xrefStart}\n%%EOF\n`));
+      recorded = all;
+    }
+    return { result: concat([bytes, ...parts]), recorded };
+  }
+
+  function validationError(msg, cause) {
+    return new HandwrittenNotesError("VALIDATION_FAILED", msg, cause);
+  }
+
+  /**
+   * Check that the original bytes are a prefix of the result and every recorded offset is right.
+   */
+  function verifyUpdate(bytes, result, recorded) {
+    for (let i = 0; i < bytes.length; i++) {
+      if (result[i] !== bytes[i]) {
+        throw validationError("Original bytes were modified.");
+      }
+    }
+    for (const w of recorded) {
+      if (!offsetMatches(result, w.offset, w.num, w.gen)) {
+        throw validationError(`Offset for object ${w.num} is wrong.`);
+      }
+    }
+  }
+
+  async function reloadResult(result) {
+    try {
+      return await PDFDocument.load(result, { updateMetadata: false });
+    } catch (e) {
+      throw validationError("Result PDF failed to load.", e);
+    }
+  }
+
+  /**
+   * Text of the Pages root object with new /Kids and /Count (other entries kept).
+   */
+  function pagesObjectText(pagesDict, kidStrs, count) {
+    let text = "<< ";
+    for (const [key, value] of pagesDict.entries()) {
+      const k = key.toString();
+      if (k === "/Kids" || k === "/Count") {
+        continue;
+      }
+      text += `${k} ${value.toString()} `;
+    }
+    return text + `/Kids [${kidStrs.join(" ")}] /Count ${count} >>\nendobj\n`;
+  }
+
+  /**
+   * Append new pages to a PDF using one incremental update (original bytes preserved).
+   * All new pages are identical and share one content stream.
+   * @param {Uint8Array} bytes Original PDF bytes.
+   * @param {string} style Paper style of the new pages.
+   * @param {number} addCount Number of pages to add (integer, 1-100).
+   * @returns {Promise<{bytes:Uint8Array, pageCount:number, previousPageCount:number, addedCount:number}>}
+   */
+  async function appendPages(bytes, style, addCount) {
+    if (!isPaperStyle(style)) {
+      throw new HandwrittenNotesError("INVALID_STYLE", `Unknown paper style: ${String(style)}`);
+    }
+    if (typeof addCount !== "number" || !Number.isInteger(addCount) || addCount < 1 || addCount > MAX_ADD_PAGES) {
+      throw new HandwrittenNotesError("INVALID_COUNT", `Page count must be an integer from 1 to ${MAX_ADD_PAGES}.`);
+    }
+    bytes = toBytes(bytes);
+    const { doc, trailer, pagesRef, pagesDict, kids, count, pageRefs: originalPageRefs } = await loadPageTree(bytes);
     // Geometry from the last page.
     const last = doc.getPages().at(-1);
     const norm = (b) => {
@@ -459,32 +578,19 @@ function createHandwrittenNotesPDF(PDFLib) {
 
     let next = Math.max(trailer.Size, doc.context.largestObjectNumber + 1);
     const contentNum = content ? next++ : null;
-    const pageNum = next++;
+    const pageNums = [];
+    for (let i = 0; i < addCount; i++) {
+      pageNums.push(next++);
+    }
     const xrefNum = trailer.kind === "stream" ? next++ : null;
 
-    const pagesNum = pagesRef.objectNumber;
-    const pagesGen = pagesRef.generationNumber;
-
-    const prefix = bytes.length > 0 && bytes[bytes.length - 1] !== 0x0a && bytes[bytes.length - 1] !== 0x0d ? enc("\n") : new Uint8Array(0);
-    let pos = bytes.length + prefix.length;
-    const parts = [prefix];
-    const written = []; // {num, gen, offset}
-    const emit = (num, gen, body) => {
-      const head = enc(`${num} ${gen} obj\n`);
-      written.push({ num, gen, offset: pos });
-      const chunks = [head, ...body];
-      for (const c of chunks) {
-        parts.push(c);
-        pos += c.length;
-      }
-    };
-
+    const objects = [];
     if (content) {
-      emit(contentNum, 0, [
-        enc(`<< /Length ${contentBytes.length} >>\nstream\n`),
-        contentBytes,
-        enc("\nendstream\nendobj\n"),
-      ]);
+      objects.push({
+        num: contentNum,
+        gen: 0,
+        body: [enc(`<< /Length ${contentBytes.length} >>\nstream\n`), contentBytes, enc("\nendstream\nendobj\n")],
+      });
     }
 
     let pageText = `<< /Type /Page /Parent ${pagesRef.toString()} /MediaBox ${mediaStr} /CropBox ${cropStr} /Rotate 0 /Resources << >>`;
@@ -495,103 +601,116 @@ function createHandwrittenNotesPDF(PDFLib) {
       pageText += ` /Contents ${contentNum} 0 R`;
     }
     pageText += " >>\nendobj\n";
-    emit(pageNum, 0, [enc(pageText)]);
-
-    let pagesText = "<< ";
-    for (const [key, value] of pagesDict.entries()) {
-      const k = key.toString();
-      if (k === "/Kids" || k === "/Count") {
-        continue;
-      }
-      pagesText += `${k} ${value.toString()} `;
+    for (const num of pageNums) {
+      objects.push({ num, gen: 0, body: [enc(pageText)] });
     }
+
     const kidStrs = kids.asArray().map((k) => k.toString());
-    kidStrs.push(`${pageNum} 0 R`);
-    pagesText += `/Kids [${kidStrs.join(" ")}] /Count ${count + 1} >>\nendobj\n`;
-    emit(pagesNum, pagesGen, [enc(pagesText)]);
-
-    const highest = Math.max(...written.map((w) => w.num), xrefNum === null ? 0 : xrefNum);
-    const newSize = Math.max(trailer.Size, highest + 1);
-    const trailerKeys =
-      `/Root ${trailer.Root.toString()}` +
-      (trailer.Info ? ` /Info ${trailer.Info.toString()}` : "") +
-      (trailer.ID ? ` /ID ${trailer.ID.toString()}` : "");
-
-    let xrefStart;
-    let recorded;
-    if (trailer.kind === "table") {
-      xrefStart = pos;
-      const sorted = [...written].sort((a, b) => a.num - b.num);
-      let t = "xref\n0 1\n0000000000 65535 f\r\n";
-      for (const w of sorted) {
-        t += `${w.num} 1\n${String(w.offset).padStart(10, "0")} ${String(w.gen).padStart(5, "0")} n\r\n`;
-      }
-      t += `trailer\n<< /Size ${newSize} ${trailerKeys} /Prev ${trailer.xrefOffset} >>\nstartxref\n${xrefStart}\n%%EOF\n`;
-      parts.push(enc(t));
-      recorded = sorted;
-    } else {
-      xrefStart = pos;
-      const all = [...written, { num: xrefNum, gen: 0, offset: xrefStart }].sort((a, b) => a.num - b.num);
-      const rows = new Uint8Array(all.length * 7);
-      all.forEach((w, i) => {
-        const o = i * 7;
-        rows[o] = 1;
-        rows[o + 1] = (w.offset >>> 24) & 0xff;
-        rows[o + 2] = (w.offset >>> 16) & 0xff;
-        rows[o + 3] = (w.offset >>> 8) & 0xff;
-        rows[o + 4] = w.offset & 0xff;
-        rows[o + 5] = (w.gen >>> 8) & 0xff;
-        rows[o + 6] = w.gen & 0xff;
-      });
-      const index = all.map((w) => `${w.num} 1`).join(" ");
-      parts.push(enc(`${xrefNum} 0 obj\n<< /Type /XRef /Size ${newSize} /W [1 4 2] /Index [${index}] /Prev ${trailer.xrefOffset} ${trailerKeys} /Length ${rows.length} >>\nstream\n`));
-      parts.push(rows);
-      parts.push(enc(`\nendstream\nendobj\nstartxref\n${xrefStart}\n%%EOF\n`));
-      recorded = all;
+    for (const num of pageNums) {
+      kidStrs.push(`${num} 0 R`);
     }
+    objects.push({
+      num: pagesRef.objectNumber,
+      gen: pagesRef.generationNumber,
+      body: [enc(pagesObjectText(pagesDict, kidStrs, count + addCount))],
+    });
 
-    const result = concat([bytes, ...parts]);
+    const { result, recorded } = writeUpdate(bytes, trailer, objects, xrefNum);
 
     // Validation.
-    const fail = (msg, cause) => new HandwrittenNotesError("VALIDATION_FAILED", msg, cause);
-    for (let i = 0; i < bytes.length; i++) {
-      if (result[i] !== bytes[i]) {
-        throw fail("Original bytes were modified.");
-      }
-    }
-    for (const w of recorded) {
-      if (!offsetMatches(result, w.offset, w.num, w.gen)) {
-        throw fail(`Offset for object ${w.num} is wrong.`);
-      }
-    }
-    let check;
-    try {
-      check = await PDFDocument.load(result, { updateMetadata: false });
-    } catch (e) {
-      throw fail("Result PDF failed to load.", e);
-    }
-    if (check.getPageCount() !== count + 1) {
-      throw fail("Result page count mismatch.");
+    verifyUpdate(bytes, result, recorded);
+    const check = await reloadResult(result);
+    if (check.getPageCount() !== count + addCount) {
+      throw validationError("Result page count mismatch.");
     }
     const checkPages = check.getPages();
-    const mb = checkPages[checkPages.length - 1].getMediaBox();
-    if (
-      Math.abs(mb.x - expectedMedia.x) > EPS ||
-      Math.abs(mb.y - expectedMedia.y) > EPS ||
-      Math.abs(mb.width - expectedMedia.width) > EPS ||
-      Math.abs(mb.height - expectedMedia.height) > EPS
-    ) {
-      throw fail("New page MediaBox mismatch.");
-    }
     for (let i = 0; i < count; i++) {
       if (checkPages[i].ref.toString() !== originalPageRefs[i]) {
-        throw fail(`Existing page ${i + 1} was replaced.`);
+        throw validationError(`Existing page ${i + 1} was replaced.`);
+      }
+    }
+    for (let i = count; i < count + addCount; i++) {
+      const mb = checkPages[i].getMediaBox();
+      if (
+        Math.abs(mb.x - expectedMedia.x) > EPS ||
+        Math.abs(mb.y - expectedMedia.y) > EPS ||
+        Math.abs(mb.width - expectedMedia.width) > EPS ||
+        Math.abs(mb.height - expectedMedia.height) > EPS
+      ) {
+        throw validationError(`New page ${i + 1} MediaBox mismatch.`);
       }
     }
 
-    return { bytes: result, pageCount: count + 1, previousPageCount: count };
+    return { bytes: result, pageCount: count + addCount, previousPageCount: count, addedCount: addCount };
   }
 
+  /**
+   * Append one page to a PDF (see appendPages).
+   * @param {Uint8Array} bytes Original PDF bytes.
+   * @param {string} style Paper style of the new page.
+   * @returns {Promise<{bytes:Uint8Array, pageCount:number, previousPageCount:number, addedCount:number}>}
+   */
+  async function appendPage(bytes, style) {
+    return appendPages(bytes, style, 1);
+  }
+
+  /**
+   * Remove pages from the end of a notebook created by this plugin, using one incremental update
+   * that rewrites only the Pages root. The page objects themselves stay in the file.
+   * @param {Uint8Array} bytes Original PDF bytes.
+   * @param {number} removeCount Number of pages to remove (integer, 1 to pageCount - 1).
+   * @returns {Promise<{bytes:Uint8Array, pageCount:number, previousPageCount:number, removedCount:number}>}
+   */
+  async function removeLastPages(bytes, removeCount) {
+    bytes = toBytes(bytes);
+    const style = await readPaperStyle(bytes);
+    if (style.status !== "ok") {
+      throw new HandwrittenNotesError("NOT_NOTEBOOK", "The PDF was not created by Handwritten Notes.");
+    }
+    const pageCount = style.pageCount;
+    if (typeof removeCount !== "number" || !Number.isInteger(removeCount) || removeCount < 1 || removeCount > pageCount - 1) {
+      throw new HandwrittenNotesError("INVALID_COUNT", `Page count must be an integer from 1 to ${pageCount - 1}.`);
+    }
+    const { doc, trailer, pagesRef, pagesDict, kids, count } = await loadPageTree(bytes);
+    const kidList = kids.asArray();
+    if (kidList.length !== count) {
+      throw unsupported("Page tree is not flat.");
+    }
+    for (const kid of kidList) {
+      const node = kid instanceof PDFRef ? doc.context.lookup(kid) : undefined;
+      const type = node instanceof PDFDict ? node.lookup(PDFName.of("Type")) : undefined;
+      if (!(type instanceof PDFName) || type.toString() !== "/Page") {
+        throw unsupported("Page tree is not flat.");
+      }
+    }
+    const keep = count - removeCount;
+    const keptStrs = kidList.slice(0, keep).map((k) => k.toString());
+
+    let next = Math.max(trailer.Size, doc.context.largestObjectNumber + 1);
+    const xrefNum = trailer.kind === "stream" ? next++ : null;
+    const objects = [
+      {
+        num: pagesRef.objectNumber,
+        gen: pagesRef.generationNumber,
+        body: [enc(pagesObjectText(pagesDict, keptStrs, keep))],
+      },
+    ];
+    const { result, recorded } = writeUpdate(bytes, trailer, objects, xrefNum);
+
+    verifyUpdate(bytes, result, recorded);
+    const check = await reloadResult(result);
+    if (check.getPageCount() !== keep) {
+      throw validationError("Result page count mismatch.");
+    }
+    const checkPages = check.getPages();
+    for (let i = 0; i < keep; i++) {
+      if (checkPages[i].ref.toString() !== keptStrs[i]) {
+        throw validationError(`Page ${i + 1} reference changed.`);
+      }
+    }
+
+    return { bytes: result, pageCount: keep, previousPageCount: count, removedCount: removeCount };
+  }
   return {
     PAPER_STYLES,
     isPaperStyle,
@@ -602,6 +721,8 @@ function createHandwrittenNotesPDF(PDFLib) {
     createNotePdf,
     readPaperStyle,
     appendPage,
+    appendPages,
+    removeLastPages,
     HandwrittenNotesError,
   };
 }
