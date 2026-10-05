@@ -1,164 +1,132 @@
 # Zotero Handwritten Notes
 
-A Zotero 10 plugin that attaches a handwriting notebook PDF to any paper in your library, so you can read the paper on your computer and take handwritten notes next to it on an iPad with Apple Pencil.
+Zotero 10用のプラグインで、ライブラリの各論文に手書きノート用のPDFを添付します。PCで論文を読み、同じ論文に紐付いたノートにiPadとApple Pencilで書き込めます。手書きの内容はZoteroのInk注釈として同期されます。
 
-## Features
+## 機能
 
-- Create handwritten-note PDFs attached to Zotero items
-- Blank paper
-- 6 mm ruled paper
-- 5 mm grid paper
-- Add pages while preserving Zotero annotations
-- Designed for iPad + Apple Pencil
+- 論文アイテムに手書きノート用PDFを作成し、子添付ファイルとして登録する
+- 用紙は白紙、6 mmの横罫、5 mmの方眼から選べる
+- 既存のZotero注釈を壊さずに、同じ用紙のページを末尾に追加できる
+- iPadとApple Pencilでの利用を前提にしている
 
-## Requirements
+## 動作環境とインストール
 
-- Zotero 10.x desktop (Windows, macOS, or Linux)
-- To write on an iPad: Zotero for iOS/iPadOS, with Zotero Sync configured for both data and files
+動作にはZotero 10.xのデスクトップ版（Windows、macOS、Linux）が必要です。iPadで書く場合は、iOS/iPadOS版Zoteroを用意し、データとファイルの両方のZotero Syncを設定してください。プラグインが動くのはデスクトップ版だけで、iPadには何もインストールしません。
 
-The plugin runs on the desktop app only. The iPad app uses the PDFs and ink annotations that sync from the desktop; nothing has to be installed on the iPad.
+1. [最新リリース](https://github.com/acaValkyrie/zotero-handwritten-notes/releases/latest)から `zotero-handwritten-notes-<バージョン>.xpi` をダウンロードする
+2. Zoteroで「ツール → プラグイン」を開く
+3. `.xpi` をプラグイン画面にドラッグするか、歯車メニューからファイルを指定してインストールする
 
-## Installation
+以降の更新は、Zoteroがリリースを自動で確認します。
 
-1. Download `zotero-handwritten-notes-<version>.xpi` from the [latest release](https://github.com/acaValkyrie/zotero-handwritten-notes/releases/latest).
-2. In Zotero, open **Tools → Plugins**.
-3. Drag the `.xpi` file onto the Plugins window, or use the gear menu → **Install Plugin From File…**.
+## 使い方
 
-Zotero checks the release feed for updates automatically.
+### ノートを作る
 
-## Usage
+1. 通常のアイテム（学術誌論文、会議論文、プレプリント、学位論文など）を1件だけ選んで右クリックする
+2. 「手書きノートを作成」を選ぶ
+3. 用紙を選んで「作成」を押す
 
-### Create a notebook
-
-1. Right-click a regular item (journal article, conference paper, preprint, thesis, …).
-2. Choose **Create Handwritten Notes**.
-3. Pick a paper style and click **Create**.
-
-A one-page A4 PDF named `Handwritten Notes.pdf` is added as a child attachment of the item:
+そのアイテムの子添付ファイルとして、A4で1ページの `Handwritten Notes.pdf` が追加されます。
 
 ```text
-Paper Item
+論文アイテム
 ├── paper.pdf
 └── Handwritten Notes.pdf
 ```
 
-If the item already has one, the new notebook is named `Handwritten Notes 2.pdf`, `Handwritten Notes 3.pdf`, and so on. Existing files are never overwritten.
+同じ名前の添付ファイルが既にある場合は、`Handwritten Notes 2.pdf`、`Handwritten Notes 3.pdf` のように番号を付けます。既存のファイルを上書きすることはありません。
 
-Sync, then open `Handwritten Notes.pdf` on your iPad and write on it with the ink tool. Your handwriting is saved as Zotero ink annotations and syncs like any other annotation.
+同期したら、iPadで `Handwritten Notes.pdf` を開き、インクツールで書き込みます。手書きはZoteroのInk注釈として保存され、他の注釈と同じように同期されます。
 
-### Add a page
+### ページを追加する
 
-When you run out of space:
+1. PCのZoteroでノートのPDFを右クリックする
+2. 「ページを追加」を選ぶ
 
-1. On the desktop, right-click the notebook PDF.
-2. Choose **Add Page**.
+作成時と同じ用紙のページが末尾に1ページ追加されます。もう一度同期すると、iPadにも新しいページが現れます。
 
-A page in the same paper style is appended to the end of the notebook. Sync again and the new page appears on the iPad.
+「ページを追加」は、このプラグイン以外で作られたPDFにも使えます。その場合は用紙の種類が分からないので、用紙を選ぶ画面が表示されます。
 
-**Add Page** also works on other PDF attachments. In that case the plugin cannot know which paper style to use, so it asks you.
+## 用紙の種類
 
-## Paper Styles
+どの用紙もA4縦（210 mm × 297 mm）です。罫線は画像ではなく細く薄い色のベクター線で描くので、拡大してもにじまず、ファイルも小さく済みます。
 
-All styles are A4 portrait (210 mm × 297 mm). Lines are thin, light-colored vector paths, so they stay sharp at any zoom and keep the file small. No images are embedded.
+| 用紙 | 内容 | 線の間隔 |
+| --- | --- | --- |
+| 白紙 | 何も描かない空のページ | — |
+| 横罫 — 6 mm | 横線のみ | 6 mm |
+| 方眼 — 5 mm | 縦横の線で正方形のマス目 | 5 mm × 5 mm |
 
-### Blank
+罫線は上下左右に10 mmの余白を取って描きます。1 mm = 72 / 25.4 ptで換算し、整数に丸めずに配置するので、間隔は正確に6 mm・5 mmになります。A4以外のPDFにページを追加した場合も、物理的な間隔は変わりません。
 
-An empty page with nothing drawn on it.
+## 仕組み
 
-### Ruled — 6 mm
+ページ追加では元のPDFを一切書き換えず、末尾に追記するだけなので、既存のページと注釈はそのまま残ります。
 
-Horizontal lines exactly 6 mm apart, inside a 10 mm margin.
+- **ノートの作成**: [pdf-lib](https://github.com/Hopding/pdf-lib) でPDFを生成し、Zotero管理下の添付ファイル（Stored Attachment）として登録します。そのためZoteroのファイル同期の対象になります。
+- **用紙の記録**: 用紙の種類はPDF内部の文書情報（`/ZoteroHandwrittenNotesPaperStyle`）に記録します。ファイルと一緒に同期されるので別のPCでも用紙を判定でき、アイテムの書誌情報には触れません。
+- **ページの追加**: PDFの増分更新（incremental update）を使います。元のファイルは1バイトも変えず、その後ろに新しいページ、更新したページツリー、新しい相互参照表を追記します。既存ページの再生成、再レンダリング、サイズ変更、回転、並べ替えはしません。
+- **注釈の扱い**: Zoteroの注釈はページ番号と紐付けてZoteroのデータベースに保存されています。末尾に追加しても既存ページの番号は変わらず、プラグインが注釈をコピー・移動・PDFへの焦き付けをすることもありません。
+- **追加ページの大きさ**: 直前の最終ページと同じMediaBoxとCropBoxを使います。最終ページが回転している場合は、見た目の大きさをそろえた回転なしのページにして、罫線の向きが崩れないようにします。
+- **置き換え前の検証**: 結果をいったん一時ファイルに書き、読み戻して次の点を確かめます。
+  - 元のバイト列がそのまま残っている
+  - 新しい相互参照表の位置がすべて正しい
+  - ページ数がちょうど1増えている
+  - 既存ページのオブジェクトが差し替わっていない
+- **失敗したとき**: どれか1つでも失敗した場合や、処理中にファイルが別のプログラムに更新された場合は、元のPDFには手を付けません。暗号化されたPDFと、相互参照表を確実に特定できないPDFも、変更せずに断ります。
+- **置き換えたあと**: Zotero本体がPDFのページを回転するときと同じ手順でZoteroに変更を伝えます。添付ファイルをアップロード対象にし、開いているリーダーを再読み込みし、全文検索の索引も作り直します。
 
-### Grid — 5 mm
+## 同期の動作と互換性
 
-Square 5 mm × 5 mm grid, inside a 10 mm margin.
-
-Spacing is computed from 1 mm = 72 / 25.4 pt and written without rounding to whole points. Pages appended to a PDF with a different page size keep the same physical spacing.
-
-## How It Works
-
-- **New notebooks** are generated with [pdf-lib](https://github.com/Hopding/pdf-lib) and imported as stored attachments, so Zotero File Sync uploads them.
-- **The paper style** is recorded in the PDF's document information dictionary (`/ZoteroHandwrittenNotesPaperStyle`). It travels with the file, so **Add Page** on another computer knows the style too, and it does not touch the item's bibliographic fields.
-- **Adding a page** uses a PDF *incremental update*:
-  - The original file is kept byte for byte, and the new page, an updated page tree, and a new cross-reference section are appended after it.
-  - Existing pages are never re-generated, re-rendered, resized, rotated, or reordered, so the page objects your annotations point at stay exactly the same.
-  - Zotero annotations live in Zotero's database, keyed by page index. Appending at the end does not change any existing page index, and the plugin never copies, moves, or flattens annotations.
-- **The new page** uses the previous last page's MediaBox and CropBox. If that page is rotated, the new page gets the same visible size without rotation, so the lines run the right way.
-- **Before the original is replaced**, the result is written to a temporary file, read back, and checked:
-  - The original bytes are unchanged.
-  - Every new cross-reference offset is correct.
-  - The page count went up by exactly one.
-  - Existing page objects were not replaced.
-
-  If anything fails, or the file changed on disk in the meantime, the original PDF is left untouched.
-- **After replacing the file**, the plugin updates Zotero the same way Zotero's own "Rotate Pages" command does:
-  - It marks the attachment for upload.
-  - It reloads any open reader tab.
-  - It re-indexes the full text.
-
-## Sync Behavior
-
-Day to day, only annotations sync:
+普段同期されるのは注釈だけで、PDFファイル自体が同期されるのはページを追加したときだけです。
 
 ```text
-Apple Pencil → ink annotation → Zotero data sync
+普段:         Apple Pencil → Ink注釈 → Zoteroのデータ同期
+ページ追加時: ページを追加 → PDFファイル更新 → Zoteroのファイル同期 → iPadが新しいファイルを取得
 ```
 
-When you add a page:
+ページは必ずPCで追加し、新しいファイルがiPadに同期されてから、iPadでそのページに書いてください。
 
-```text
-Add Page → PDF file updated → Zotero file sync → iPad downloads the new file
-```
+| 環境 | 対応 |
+| --- | --- |
+| Zotero 10.x デスクトップ版（Windows、macOS、Linux） | 対応 |
+| Zotero 9.x以前 | 非対応 |
+| Zoteroのベータ版・ナイトリー版、Zotero 11以降 | 未検証 |
+| iOS/iPadOS版Zotero | プラグインは入れず、同期されたPDFと注釈を使う |
 
-After that, only annotations sync again. Add pages on the desktop and let the new file sync to the iPad before writing on the new page there.
+## 開発
 
-## Compatibility
-
-| | Status |
-|---|---|
-| Zotero 10.x desktop on Windows, macOS, Linux | Supported |
-| Zotero 9.x and earlier | Not supported |
-| Zotero beta / nightly builds, Zotero 11+ | Untested |
-| Zotero for iOS/iPadOS | Not a plugin target; uses the synced PDFs and annotations |
-
-Encrypted PDFs, and PDFs whose cross-reference data cannot be located reliably, are rejected without modification.
-
-## Development
-
-Requires Node.js 20 or later. There are no npm dependencies.
+開発にはNode.js 20以降が必要です。npmの依存パッケージはありません。
 
 ```sh
-npm test         # unit tests for PDF generation and page appending
-npm run build    # writes build/zotero-handwritten-notes-<version>.xpi and build/updates.json
+npm test         # PDF生成とページ追加の単体テスト
+npm run build    # build/zotero-handwritten-notes-<バージョン>.xpi と build/updates.json を生成
 ```
 
-To run the plugin from source:
+ソースから動かす手順は次のとおりです。普段使うライブラリを壊さないよう、開発用のプロファイルとデータディレクトリを別に用意してください（`zotero -P`）。
 
-1. Close Zotero.
-2. In your Zotero profile's `extensions` directory, create a file named `handwritten-notes@acavalkyrie.github.io` whose content is the absolute path of this repository's `addon` directory.
-3. Start Zotero.
-
-Use a separate profile and data directory for development (`zotero -P`).
-
-Layout:
+1. Zoteroを終了する
+2. Zoteroプロファイルの `extensions` ディレクトリに `handwritten-notes@acavalkyrie.github.io` という名前のファイルを作り、中身にこのリポジトリの `addon` ディレクトリの絶対パスを書く
+3. Zoteroを起動する
 
 ```text
 addon/
 ├── manifest.json, bootstrap.js
 ├── content/
-│   ├── pdf-core.js               # paper drawing, PDF creation, incremental page append
-│   ├── handwritten-notes.js      # Zotero menus, attachment handling, file replacement
-│   └── paper-style-dialog.*      # paper style dialog
-├── locale/{en-US,ja-JP}/         # Fluent strings
-└── vendor/pdf-lib.min.js         # pdf-lib 1.17.1 (MIT)
+│   ├── pdf-core.js               # 罫線の描画、PDF生成、増分更新によるページ追加
+│   ├── handwritten-notes.js      # Zoteroのメニュー、添付ファイルの処理、ファイルの置き換え
+│   └── paper-style-dialog.*      # 用紙選択ダイアログ
+├── locale/{en-US,ja-JP}/         # Fluentの文言
+└── vendor/pdf-lib.min.js         # pdf-lib 1.17.1（MIT）
 scripts/
-├── build.mjs                     # dependency-free XPI builder
-├── make-samples.js, verify-pypdf.py   # optional cross-check with pypdf
-test/                             # node:test unit tests
+├── build.mjs                     # 依存なしのXPIビルド
+├── make-samples.js, verify-pypdf.py   # pypdfによる任意の照合
+test/                             # node:testの単体テスト
 ```
 
-Releases: bump `version` in `addon/manifest.json`, commit, and push a tag `v<version>`. GitHub Actions builds the XPI and `updates.json` and attaches both to a GitHub release. The plugin's `update_url` points at `releases/latest/download/updates.json`.
+リリースでは、`addon/manifest.json` の `version` を上げてコミットし、`v<バージョン>` のタグをpushします。GitHub ActionsがXPIと `updates.json` をビルドし、GitHubのリリースに添付します。プラグインの `update_url` は `releases/latest/download/updates.json` を指しています。
 
-## License
+## ライセンス
 
-[MIT](LICENSE). Bundles [pdf-lib](https://github.com/Hopding/pdf-lib) 1.17.1, © Andrew Dillon, MIT License ([addon/vendor/pdf-lib.LICENSE.md](addon/vendor/pdf-lib.LICENSE.md)).
+[MIT](LICENSE)。[pdf-lib](https://github.com/Hopding/pdf-lib) 1.17.1（© Andrew Dillon、MITライセンス、[addon/vendor/pdf-lib.LICENSE.md](addon/vendor/pdf-lib.LICENSE.md)）を同梱しています。
