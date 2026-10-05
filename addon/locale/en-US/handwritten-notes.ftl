@@ -2,6 +2,10 @@ handwritten-notes-menu-create =
     .label = Create Handwritten Notes
 handwritten-notes-menu-add-page =
     .label = Add Page
+handwritten-notes-menu-add-pages =
+    .label = Add Multiple Pages…
+handwritten-notes-menu-remove-pages =
+    .label = Remove Pages…
 
 handwritten-notes-dialog-create =
     .title = Create Handwritten Notes
@@ -9,8 +13,16 @@ handwritten-notes-dialog-create =
 handwritten-notes-dialog-add =
     .title = Add Page
     .buttonlabelaccept = Add
+handwritten-notes-dialog-add-multiple =
+    .title = Add Multiple Pages
+    .buttonlabelaccept = Add
+handwritten-notes-dialog-remove =
+    .title = Remove Pages
+    .buttonlabelaccept = Remove
 
 handwritten-notes-paper-style = Paper Style:
+handwritten-notes-page-count = Number of pages:
+handwritten-notes-remove-count = Pages to remove from the end:
 handwritten-notes-style-blank =
     .label = Blank
 handwritten-notes-style-ruled-6mm =
@@ -23,10 +35,21 @@ handwritten-notes-style-name-grid-5mm = Grid — 5 mm
 
 handwritten-notes-notice-unknown = This PDF has no saved paper style. Choose the style for the new page.
 handwritten-notes-notice-invalid = The saved paper style of this PDF could not be read. Choose the style for the new page.
+handwritten-notes-remove-annotated-upto = Annotations exist up to page { $page } (of { $total } pages).
+handwritten-notes-remove-no-annotations = This notebook has no annotations ({ $total } pages).
+handwritten-notes-remove-range = Pages { $from }–{ $to } will be removed.
+handwritten-notes-remove-single = Page { $page } will be removed.
+handwritten-notes-remove-sync-note = Sync first so that handwriting from your other devices is included.
+handwritten-notes-remove-confirm-title = Remove Annotated Pages?
+handwritten-notes-remove-confirm-text = The pages to remove (pages { $from }–{ $to }) contain { $count } annotations. They will be deleted together with the pages and cannot be restored.
+handwritten-notes-remove-confirm-button = Remove Pages and Annotations
 
 handwritten-notes-progress-title = Handwritten Notes
 handwritten-notes-created = Created “{ $fileName }”.
 handwritten-notes-page-added = Added page { $page } ({ $style }).
+handwritten-notes-pages-added = Added { $count } pages ({ $style }). The notebook now has { $total } pages.
+handwritten-notes-pages-removed = Removed { $count } pages. The notebook now has { $total } pages.
+handwritten-notes-annotations-removed = Deleted { $count } annotations.
 
 handwritten-notes-error-title = Handwritten Notes
 handwritten-notes-error-not-editable = This library is read-only, or its files cannot be edited.
@@ -41,3 +64,6 @@ handwritten-notes-error-file-changed = The PDF was modified by another program d
 handwritten-notes-error-notify-failed = The page was added, but Zotero could not be notified of the change. Run Sync manually to upload the file.
 handwritten-notes-error-generic = An unexpected error occurred. See Help → Debug Output Logging for details.
 handwritten-notes-error-sync-required = A newer version of this PDF is on the server, or it has a sync conflict. Sync first, then try again.
+handwritten-notes-error-remove-not-notebook = Pages can only be removed from notebooks created by Handwritten Notes.
+handwritten-notes-error-remove-single-page = This notebook has only one page.
+handwritten-notes-error-annotations-failed = The pages were removed, but some annotations on them could not be deleted. See Help → Debug Output Logging.

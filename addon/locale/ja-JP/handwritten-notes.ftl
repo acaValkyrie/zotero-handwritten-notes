@@ -2,6 +2,10 @@ handwritten-notes-menu-create =
     .label = 手書きノートを作成
 handwritten-notes-menu-add-page =
     .label = ページを追加
+handwritten-notes-menu-add-pages =
+    .label = 複数ページを追加…
+handwritten-notes-menu-remove-pages =
+    .label = ページを削除…
 
 handwritten-notes-dialog-create =
     .title = 手書きノートを作成
@@ -9,8 +13,16 @@ handwritten-notes-dialog-create =
 handwritten-notes-dialog-add =
     .title = ページを追加
     .buttonlabelaccept = 追加
+handwritten-notes-dialog-add-multiple =
+    .title = 複数ページを追加
+    .buttonlabelaccept = 追加
+handwritten-notes-dialog-remove =
+    .title = ページを削除
+    .buttonlabelaccept = 削除
 
 handwritten-notes-paper-style = 用紙:
+handwritten-notes-page-count = ページ数:
+handwritten-notes-remove-count = 末尾から削除するページ数:
 handwritten-notes-style-blank =
     .label = 白紙
 handwritten-notes-style-ruled-6mm =
@@ -23,10 +35,21 @@ handwritten-notes-style-name-grid-5mm = 方眼 — 5 mm
 
 handwritten-notes-notice-unknown = このPDFには用紙の情報がありません。追加するページの用紙を選択してください。
 handwritten-notes-notice-invalid = このPDFに保存された用紙の情報を読み取れませんでした。追加するページの用紙を選択してください。
+handwritten-notes-remove-annotated-upto = 注釈は { $page } ページ目まであります（全 { $total } ページ）。
+handwritten-notes-remove-no-annotations = このノートには注釈がありません（全 { $total } ページ）。
+handwritten-notes-remove-range = { $from }〜{ $to } ページ目を削除します。
+handwritten-notes-remove-single = { $page } ページ目を削除します。
+handwritten-notes-remove-sync-note = 他の端末で書いた内容を反映させるため、先に同期してから実行してください。
+handwritten-notes-remove-confirm-title = 注釈のあるページを削除しますか？
+handwritten-notes-remove-confirm-text = 削除するページ（{ $from }〜{ $to } ページ目）には注釈が { $count } 件あります。注釈もページと一緒に削除され、元に戻せません。
+handwritten-notes-remove-confirm-button = 注釈ごと削除
 
 handwritten-notes-progress-title = 手書きノート
 handwritten-notes-created = 「{ $fileName }」を作成しました。
 handwritten-notes-page-added = { $page } ページ目を追加しました（{ $style }）。
+handwritten-notes-pages-added = { $count } ページを追加しました（{ $style }）。全 { $total } ページになりました。
+handwritten-notes-pages-removed = { $count } ページを削除しました。全 { $total } ページになりました。
+handwritten-notes-annotations-removed = 注釈を { $count } 件削除しました。
 
 handwritten-notes-error-title = 手書きノート
 handwritten-notes-error-not-editable = このライブラリは読み取り専用か、ファイルを編集できません。
@@ -41,3 +64,6 @@ handwritten-notes-error-file-changed = 処理中にPDFが他のプログラム�
 handwritten-notes-error-notify-failed = ページは追加しましたが、Zoteroへの変更通知に失敗しました。手動で同期を実行してファイルをアップロードしてください。
 handwritten-notes-error-generic = 予期しないエラーが発生しました。詳細は「ヘルプ → デバッグ出力ログ」を参照してください。
 handwritten-notes-error-sync-required = このPDFはサーバーにより新しい版があるか、同期の競合が起きています。先に同期してから、もう一度お試しください。
+handwritten-notes-error-remove-not-notebook = ページを削除できるのは、このプラグインで作成したノートだけです。
+handwritten-notes-error-remove-single-page = このノートは1ページしかないため、削除できません。
+handwritten-notes-error-annotations-failed = ページは削除しましたが、削除したページ上の注釈の一部を削除できませんでした。詳細は「ヘルプ → デバッグ出力ログ」を参照してください。

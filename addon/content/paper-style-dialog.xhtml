@@ -35,13 +35,19 @@
 		data-l10n-attrs="buttonlabelaccept"
 	>
 		<vbox>
+			<description id="info" hidden="true"/>
 			<description id="notice" hidden="true"/>
-			<label data-l10n-id="handwritten-notes-paper-style" control="paper-style"/>
+			<label id="style-label" data-l10n-id="handwritten-notes-paper-style" control="paper-style"/>
 			<radiogroup id="paper-style">
 				<radio value="blank" data-l10n-id="handwritten-notes-style-blank"/>
 				<radio value="ruled-6mm" data-l10n-id="handwritten-notes-style-ruled-6mm"/>
 				<radio value="grid-5mm" data-l10n-id="handwritten-notes-style-grid-5mm"/>
 			</radiogroup>
-		</vbox>
-	</dialog>
+			<hbox id="count-row" align="center" hidden="true">
+				<label id="count-label" data-l10n-id="handwritten-notes-page-count" control="page-count"/>
+				<html:input id="page-count" type="number" min="1" max="100" step="1" style="width: 5em;"/>
+			</hbox>
+			<description id="range" hidden="true"/>
+			<description id="note" hidden="true" style="opacity: 0.7;"/>
+		</vbox>	</dialog>
 </window>
