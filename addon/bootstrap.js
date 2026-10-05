@@ -16,6 +16,7 @@ function startup({ id, version, rootURI }) {
   Services.scriptloader.loadSubScript(rootURI + "content/handwritten-notes.js");
 
   HandwrittenNotes.init({ id, version, rootURI, core: createHandwrittenNotesPDF(PDFLib) });
+  Zotero.HandwrittenNotes = HandwrittenNotes;
   HandwrittenNotes.registerMenus();
   HandwrittenNotes.addToAllWindows();
 }
@@ -33,5 +34,6 @@ function shutdown() {
   HandwrittenNotes.unregisterMenus();
   chromeHandle?.destruct();
   chromeHandle = null;
+  delete Zotero.HandwrittenNotes;
   HandwrittenNotes = undefined;
 }
