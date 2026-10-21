@@ -4,7 +4,7 @@ var HandwrittenNotes = {
   rootURI: null,
   core: null,
   l10n: null,
-  menuID: null,
+  menuIDs: [],
   busy: new Set(),
 
   init({ id, version, rootURI, core }) {
@@ -56,7 +56,7 @@ var HandwrittenNotes = {
       this.runCommand(win, item, fn);
     };
 
-    const registered = Zotero.MenuManager.registerMenu({
+    this.registerMenu({
       menuID: "handwritten-notes-item-menu",
       pluginID: this.id,
       target: "main/library/item",
@@ -103,17 +103,106 @@ var HandwrittenNotes = {
         }
       ]
     });
-    this.menuID = registered || null;
-    if (!registered) {
-      this.log("Menu registration failed");
+
+    const standaloneItem = (showing) => ({
+      menuType: "menuitem",
+      l10nID: "handwritten-notes-menu-create-standalone",
+      icon: "chrome://handwritten-notes/content/icons/menu-create.svg",
+      onShowing: showing,
+      onCommand: (event, context) => {
+        const win = event.target.ownerGlobal;
+        const target = this.standaloneTarget(context);
+        if (!target) return;
+        this.createStandaloneNotes(win, target);
+      }
+    });
+
+    this.registerMenu({
+      menuID: "handwritten-notes-add-note-menu",
+      pluginID: this.id,
+      target: "main/library/addNote",
+      menus: [
+        standaloneItem((event, context) => {
+          if (context.tabType !== "library") {
+            context.setVisible(false);
+            return;
+          }
+          context.setVisible(true);
+          let enabled = false;
+          try {
+            const rows = Zotero.getActiveZoteroPane().getCollectionTreeRows();
+            enabled = this.rowsWritable(rows);
+          }
+          catch (e) {
+            Zotero.logError(e);
+          }
+          context.setEnabled(enabled);
+        })
+      ]
+    });
+
+    this.registerMenu({
+      menuID: "handwritten-notes-collection-menu",
+      pluginID: this.id,
+      target: "main/library/collection",
+      menus: [
+        standaloneItem((event, context) => {
+          let visible = false;
+          try {
+            const rows = context.collectionTreeRows || [];
+            visible = this.rowsWritable(rows)
+              && rows.every((r) => r.isLibrary(true) || r.isCollection());
+          }
+          catch (e) {
+            Zotero.logError(e);
+          }
+          context.setVisible(visible);
+        })
+      ]
+    });
+  },
+
+  registerMenu(options) {
+    const registered = Zotero.MenuManager.registerMenu(options);
+    if (registered) {
+      this.menuIDs.push(registered);
+    }
+    else {
+      this.log("Menu registration failed: " + options.menuID);
     }
   },
 
   unregisterMenus() {
-    if (this.menuID) {
-      Zotero.MenuManager.unregisterMenu(this.menuID);
-      this.menuID = null;
+    for (const id of this.menuIDs) {
+      Zotero.MenuManager.unregisterMenu(id);
     }
+    this.menuIDs = [];
+  },
+
+  // True if rows is non-empty, all in one library, and that library accepts new files.
+  rowsWritable(rows) {
+    if (!rows.length) return false;
+    const libraryID = rows[0].ref.libraryID;
+    return rows.every((r) => r.ref.libraryID === libraryID && r.editable && r.filesEditable);
+  },
+
+  // { libraryID, collectionIDs } from the menu context, or null.
+  standaloneTarget(context) {
+    if (context.collectionTreeRows) {
+      const rows = context.collectionTreeRows;
+      if (!this.rowsWritable(rows)) return null;
+      return {
+        libraryID: rows[0].ref.libraryID,
+        collectionIDs: rows.filter((r) => r.isCollection()).map((r) => r.ref.id)
+      };
+    }
+    const pane = Zotero.getActiveZoteroPane();
+    const rows = pane.getCollectionTreeRows();
+    if (!this.rowsWritable(rows)) return null;
+    return {
+      libraryID: rows[0].ref.libraryID,
+      collectionIDs: pane.getSelectedCollections(true)
+    };
   },
 
   async runCommand(win, item, fn) {
@@ -262,6 +351,70 @@ var HandwrittenNotes = {
   async createNotes(win, parentItem) {
     if (!this.checkLibraryEditable(win, parentItem)) return;
 
+    await this.createNotesCommon(win, {
+      libraryID: parentItem.libraryID,
+      pickName: async () => {
+        const used = new Set();
+        for (const att of Zotero.Items.get(parentItem.getAttachments())) {
+          if (att.attachmentFilename) used.add(att.attachmentFilename.toLowerCase());
+          used.add((att.getField("title") || "").toLowerCase());
+        }
+        for (let n = 1; ; n++) {
+          const base = n === 1 ? "Handwritten Notes" : "Handwritten Notes " + n;
+          if (!used.has((base + ".pdf").toLowerCase())) return base;
+        }
+      },
+      importOptions: { parentItemID: parentItem.id }
+    });
+  },
+
+  // Create a top-level Handwritten Notes attachment (no parent item)
+  async createStandaloneNotes(win, { libraryID, collectionIDs }) {
+    if (this.busy.has("standalone")) return;
+    this.busy.add("standalone");
+    try {
+      const library = Zotero.Libraries.get(libraryID);
+      if (!library.editable || !library.filesEditable) {
+        this.alert(win, "not-editable");
+        return;
+      }
+
+      await this.createNotesCommon(win, {
+        libraryID,
+        pickName: async () => {
+          const now = new Date();
+          const pad = (n) => String(n).padStart(2, "0");
+          const day = now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate());
+          const prefix = "Handwritten Notes " + day;
+
+          const s = new Zotero.Search();
+          s.libraryID = libraryID;
+          s.addCondition("itemType", "is", "attachment");
+          s.addCondition("title", "contains", prefix);
+          s.addCondition("noChildren", "true");
+          const ids = await s.search();
+          const items = await Zotero.Items.getAsync(ids);
+          const used = new Set(items.map((it) => (it.getField("title") || "").toLowerCase()));
+
+          for (let n = 1; ; n++) {
+            const base = n === 1 ? prefix : prefix + " " + n;
+            if (!used.has((base + ".pdf").toLowerCase())) return base;
+          }
+        },
+        importOptions: collectionIDs && collectionIDs.length ? { collections: collectionIDs } : {}
+      });
+    }
+    catch (e) {
+      Zotero.logError(e);
+      this.alert(win, "generic");
+    }
+    finally {
+      this.busy.delete("standalone");
+    }
+  },
+
+  // Paper style prompt, PDF generation, import and notification shared by both creation paths
+  async createNotesCommon(win, { libraryID, pickName, importOptions }) {
     const style = await this.promptPaperStyle(win, { mode: "create" });
     if (!style) return;
 
@@ -275,18 +428,8 @@ var HandwrittenNotes = {
       return;
     }
 
-    const used = new Set();
-    for (const att of Zotero.Items.get(parentItem.getAttachments())) {
-      if (att.attachmentFilename) used.add(att.attachmentFilename.toLowerCase());
-      used.add((att.getField("title") || "").toLowerCase());
-    }
-    let base;
-    let fileName;
-    for (let n = 1; ; n++) {
-      base = n === 1 ? "Handwritten Notes" : "Handwritten Notes " + n;
-      fileName = base + ".pdf";
-      if (!used.has(fileName.toLowerCase())) break;
-    }
+    const base = await pickName();
+    const fileName = base + ".pdf";
 
     const tmpDir = PathUtils.join(
       Zotero.getTempDirectory().path,
@@ -299,11 +442,11 @@ var HandwrittenNotes = {
       await IOUtils.write(tmpFile, bytes);
       attachment = await Zotero.Attachments.importFromFile({
         file: tmpFile,
-        parentItemID: parentItem.id,
-        libraryID: parentItem.libraryID,
+        libraryID,
         title: fileName,
         fileBaseName: base,
-        contentType: "application/pdf"
+        contentType: "application/pdf",
+        ...importOptions
       });
     }
     catch (e) {
